@@ -30,7 +30,38 @@ const haversineDistance = (lat1, lon1, lat2, lon2) => {
   return EARTH_RADIUS * c;
 };
 
-const moveCar = (startLat, startLon, endLat, endLon, speed, elapsedTime) => {
+const moveCar = (car, currentTime) => {
+  const elapsedTime = (currentTime - car.startTime) / 1000;
+  const { lat, lon, reachedDestination } = moveTowards(
+    car.location.lat,
+    car.location.lon,
+    car.target.lat,
+    car.target.lon,
+    car.speed,
+    elapsedTime
+  );
+
+  if (reachedDestination) {
+    car.location = { lat, lon };
+    car.target = generateRandomNearbyLocation(
+      KHALIFA_TOWER_LAT,
+      KHALIFA_TOWER_LON,
+      5
+    );
+    car.startTime = currentTime;
+  } else {
+    car.location = { lat, lon };
+  }
+};
+
+const moveTowards = (
+  startLat,
+  startLon,
+  endLat,
+  endLon,
+  speed,
+  elapsedTime
+) => {
   const distance = haversineDistance(startLat, startLon, endLat, endLon);
   const totalTime = distance / speed;
   const progress = Math.min(elapsedTime / (totalTime * 3600), 1);
@@ -42,9 +73,114 @@ const moveCar = (startLat, startLon, endLat, endLon, speed, elapsedTime) => {
   };
 };
 
+// Expanded list of male first names
+const firstNames = [
+  "Ali",
+  "Mohammed",
+  "Ahmed",
+  "Omar",
+  "Khaled",
+  "Zayn",
+  "Hassan",
+  "Tariq",
+  "Yusuf",
+  "Karim",
+  "Rami",
+  "Samir",
+  "Amir",
+  "Fahad",
+  "Walid",
+  "Nasser",
+  "Zaid",
+  "Sami",
+  "Faris",
+  "Jamil",
+  "Yara",
+  "Rami",
+  "Rayan",
+  "Othman",
+  "Rashid",
+  "Fares",
+  "Musa",
+  "Sulaiman",
+  "Zaher",
+  "Hadi",
+  "Tariq",
+  "Rashid",
+  "Bilal",
+  "Hassan",
+  "Mazen",
+  "Imad",
+  "Adnan",
+  "Mujtaba",
+  "Ayman",
+  "Fawzi",
+  "Bashir",
+  "Amir",
+  "Sami",
+  "Ibrahim",
+  "Mousa",
+  "Tamer",
+  "Riad",
+  "Majed",
+  "Ahmad",
+  "Nabil",
+  "Rami",
+];
+
+const lastNames = [
+  "Al-Mansoori",
+  "Al-Hashimi",
+  "Al-Qasimi",
+  "Al-Nuaimi",
+  "Al-Farsi",
+  "Al-Majed",
+  "Al-Dhaheri",
+  "Al-Suwaidi",
+  "Al-Kuwari",
+  "Al-Obaidli",
+  "Al-Rahmani",
+  "Al-Basha",
+  "Al-Saleh",
+  "Al-Mutawa",
+  "Al-Ghanem",
+  "Al-Mazrouei",
+  "Al-Jabari",
+  "Al-Khalaf",
+  "Al-Sabawi",
+  "Al-Ansari",
+  "Al-Shamsi",
+  "Al-Kaabi",
+  "Al-Hassan",
+  "Al-Shahidi",
+  "Al-Qudah",
+  "Al-Muhairi",
+  "Al-Maktoum",
+  "Al-Ali",
+  "Al-Siddiqi",
+  "Al-Nasr",
+  "Al-Khatib",
+  "Al-Fahidi",
+  "Al-Amiri",
+  "Al-Saeedi",
+  "Al-Suwaiyan",
+  "Al-Rashid",
+  "Al-Tamimi",
+  "Al-Hashimi",
+  "Al-Maghribi",
+  "Al-Shawi",
+  "Al-Fahad",
+  "Al-Mubarak",
+  "Al-Dawood",
+  "Al-Ghazi",
+  "Al-Qureishi",
+  "Al-Mousa",
+  "Al-Qatari",
+  "Al-Turki",
+  "Al-Sharif",
+];
+
 const generateRandomName = () => {
-  const firstNames = ["Ali", "Mohammed", "Fatima", "Ahmed", "Sara"];
-  const lastNames = ["Al-Mansoori", "Al-Hashimi", "Al-Qasimi", "Al-Nuaimi"];
   return `${firstNames[Math.floor(Math.random() * firstNames.length)]} ${
     lastNames[Math.floor(Math.random() * lastNames.length)]
   }`;
@@ -88,48 +224,54 @@ const createCar = (id) => ({
   carData: generateRandomCarData(),
 });
 
-let cars = []; // Cached cars for consistent tracking
+let cars = [];
+const initializeCars = (count) => {
+  cars = Array.from({ length: count }, (_, i) => createCar(i + 1));
+};
 
+// Get all cars, default 30
 app.get("/locations", (req, res) => {
-  let count = parseInt(req.query.count) || 30; // Default to 30 cars
+  let count = parseInt(req.query.count) || 30;
   const currentTime = Date.now();
 
   if (cars.length !== count) {
-    cars = Array.from({ length: count }, (_, i) => createCar(i + 1));
+    initializeCars(count);
   }
 
-  const updatedLocations = cars.map((car) => {
-    const elapsedTime = (currentTime - car.startTime) / 1000;
-    const { lat, lon, reachedDestination } = moveCar(
-      car.location.lat,
-      car.location.lon,
-      car.target.lat,
-      car.target.lon,
-      car.speed,
-      elapsedTime
-    );
+  cars.forEach((car) => moveCar(car, currentTime));
 
-    if (reachedDestination) {
-      car.location = { lat, lon };
-      car.target = generateRandomNearbyLocation(
-        KHALIFA_TOWER_LAT,
-        KHALIFA_TOWER_LON,
-        5
-      );
-      car.startTime = currentTime;
-    }
-
-    return {
+  res.json(
+    cars.map((car) => ({
       id: car.id,
-      lat,
-      lon,
+      lat: car.location.lat,
+      lon: car.location.lon,
       speed: car.speed,
       driver: car.driver,
       carData: car.carData,
-    };
-  });
+    }))
+  );
+});
 
-  res.json(updatedLocations);
+// Get a single car by ID
+app.get("/locations/:id", (req, res) => {
+  const carId = parseInt(req.params.id);
+  const currentTime = Date.now();
+
+  const car = cars.find((c) => c.id === carId);
+  if (!car) {
+    return res.status(404).json({ error: "Car not found" });
+  }
+
+  moveCar(car, currentTime);
+
+  res.json({
+    id: car.id,
+    lat: car.location.lat,
+    lon: car.location.lon,
+    speed: car.speed,
+    driver: car.driver,
+    carData: car.carData,
+  });
 });
 
 app.listen(port, () => {
