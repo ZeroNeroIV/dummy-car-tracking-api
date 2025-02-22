@@ -257,21 +257,32 @@ app.get("/locations/:id", (req, res) => {
   const carId = parseInt(req.params.id);
   const currentTime = Date.now();
 
+  // Check if the car already exists
   const car = cars.find((c) => c.id === carId);
-  if (!car) {
-    return res.status(404).json({ error: "Car not found" });
+  if (car) {
+    // If the car exists, move the car and return its data
+    moveCar(car, currentTime);
+    res.json({
+      id: car.id,
+      lat: car.location.lat,
+      lon: car.location.lon,
+      speed: car.speed,
+      driver: car.driver,
+      carData: car.carData,
+    });
+  } else {
+    // If the car does not exist, create a new car with the given ID
+    const newCar = createCar(carId);
+    cars.push(newCar); // Add the new car to the list of cars
+    res.json({
+      id: newCar.id,
+      lat: newCar.location.lat,
+      lon: newCar.location.lon,
+      speed: newCar.speed,
+      driver: newCar.driver,
+      carData: newCar.carData,
+    });
   }
-
-  moveCar(car, currentTime);
-
-  res.json({
-    id: car.id,
-    lat: car.location.lat,
-    lon: car.location.lon,
-    speed: car.speed,
-    driver: car.driver,
-    carData: car.carData,
-  });
 });
 
 app.listen(port, () => {
